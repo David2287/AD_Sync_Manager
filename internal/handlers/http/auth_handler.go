@@ -14,9 +14,17 @@ import (
 )
 
 // AuthHandler groups all authentication endpoints.
-type AuthHandler struct{}
+type AuthHandler struct {
+	useUserBind bool
+}
 
-func NewAuthHandler() *AuthHandler { return &AuthHandler{} }
+// NewAuthHandler constructs an AuthHandler.
+// Pass useUserBind=true when AD_USE_USER_BIND is enabled so that the handler
+// stores per-user LDAP credentials in the in-memory cache on login and clears
+// them on logout.
+func NewAuthHandler(useUserBind bool) *AuthHandler {
+	return &AuthHandler{useUserBind: useUserBind}
+}
 
 // Login handles POST /api/v1/auth/login and POST /api/login.
 //
@@ -56,9 +64,16 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	audit.LogLogin(req.Username, c.ClientIP(), true, "")
-
 	claims, _ := auth.ValidateJWT(token) // safe: we just generated it
+
+	// When user-bind mode is active, cache the user's credentials for the JWT
+	// lifetime so that subsequent LDAP operations can bind as this user.
+	// The password lives only in process memory and is cleared on logout.
+	if h.useUserBind {
+		auth.StoreCredential(token, dn, req.Password, claims.ExpiresAt.Time)
+	}
+
+	audit.LogLogin(req.Username, c.ClientIP(), true, "")
 
 	c.JSON(http.StatusOK, gin.H{
 		"token":      token,
@@ -70,11 +85,15 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 // Logout handles POST /api/v1/auth/logout.
 // Adds the current token to the deny-list so ValidateJWT will reject it.
+// When user-bind mode is active it also removes the cached credentials.
 func (h *AuthHandler) Logout(c *gin.Context) {
 	raw := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
 	raw = strings.TrimSpace(raw)
 	if raw != "" {
 		auth.RevokeToken(raw)
+		if h.useUserBind {
+			auth.DeleteCredential(raw)
+		}
 	}
 	c.Status(http.StatusNoContent)
 }

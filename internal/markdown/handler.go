@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,31 +12,41 @@ import (
 )
 
 // pkgADClient is the package-level ADClient set by Init.
+// Kept for backward-compat; handlers now create context-aware clients per request.
 var pkgADClient ADClient
 
-// Init sets the ADClient used by all markdown handlers. Must be called once at
-// application startup, before any HTTP request reaches these handlers.
+// Init sets a fallback ADClient. Kept for backward-compat and tests.
 func Init(client ADClient) {
 	pkgADClient = client
 }
 
-// NewEmployeeADClient returns the default ADClient backed by the employee package.
-// Pass this to Init in production; use a mock in tests.
+// NewEmployeeADClient returns the default ADClient backed by the employee package
+// using context.Background() — suitable for tests or when no user context exists.
 func NewEmployeeADClient() ADClient {
-	return employeeAdapter{}
+	return contextAwareAdapter{ctx: context.Background()}
 }
 
-// employeeAdapter adapts the package-level employee functions to the ADClient
-// interface so the markdown package has no compile-time dependency on how the
-// employee package is initialised.
-type employeeAdapter struct{}
-
-func (employeeAdapter) GetEmployeeByDN(dn string) (*employee.Employee, error) {
-	return employee.GetEmployeeByDN(dn)
+// contextAwareAdapter implements ADClient and threads the request context into
+// every employee package call so that LDAP binds respect the per-user credentials
+// injected by RequireAuth middleware when AD_USE_USER_BIND=true.
+type contextAwareAdapter struct {
+	ctx context.Context
 }
 
-func (employeeAdapter) UpdateEmployeeAttribute(dn, attrName, newValue string) error {
-	return employee.UpdateEmployeeAttribute(dn, attrName, newValue)
+func (a contextAwareAdapter) GetEmployeeByDN(dn string) (*employee.Employee, error) {
+	return employee.GetEmployeeByDN(a.ctx, dn)
+}
+
+func (a contextAwareAdapter) UpdateEmployeeAttribute(dn, attrName, newValue string) error {
+	return employee.UpdateEmployeeAttribute(a.ctx, dn, attrName, newValue)
+}
+
+// newRequestADClient creates a context-aware ADClient for the current HTTP
+// request. When AD_USE_USER_BIND=true the context carries the user's LDAPCred
+// and all AD operations bind as that user; otherwise they fall back to the
+// service account transparently.
+func newRequestADClient(r *http.Request) ADClient {
+	return contextAwareAdapter{ctx: r.Context()}
 }
 
 // ValidateMarkdownHandler handles POST /api/v1/markdown/validate.
@@ -43,11 +54,6 @@ func (employeeAdapter) UpdateEmployeeAttribute(dn, attrName, newValue string) er
 // Accepts JSON: {"markdown": "..."}
 // Parses the document, validates every operation against AD, and returns a
 // structured response. Never writes to AD.
-//
-// HTTP status codes:
-//
-//	400 – invalid JSON body or completely unparseable document
-//	200 – document parsed; valid:false when semantic errors were found
 func ValidateMarkdownHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Markdown string `json:"markdown"`
@@ -63,7 +69,7 @@ func ValidateMarkdownHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ops, errs := ValidateOperations(ops, pkgADClient)
+	ops, errs := ValidateOperations(ops, newRequestADClient(r))
 
 	if ops == nil {
 		ops = []MarkdownOperation{}
@@ -83,11 +89,6 @@ func ValidateMarkdownHandler(w http.ResponseWriter, r *http.Request) {
 //
 // Requires RequireGroup middleware (EditorGroupDN) applied at the router level.
 // Parses, validates, and applies all valid operations. Partial success is allowed.
-//
-// HTTP status codes:
-//
-//	400 – invalid JSON body or completely unparseable document
-//	200 – processing complete (check applied/failed counts in body)
 func ApplyMarkdownHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Markdown string `json:"markdown"`
@@ -103,8 +104,9 @@ func ApplyMarkdownHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ops, _ = ValidateOperations(ops, pkgADClient)
-	details := ApplyOperations(ops, pkgADClient)
+	client := newRequestADClient(r)
+	ops, _ = ValidateOperations(ops, client)
+	details := ApplyOperations(ops, client)
 
 	var applied, failed int
 	for _, d := range details {
@@ -115,8 +117,6 @@ func ApplyMarkdownHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build audit change list correlating validated ops (old/new values) with
-	// apply results (success flag). Both slices are parallel by construction.
 	var operator string
 	if claims := auth.ClaimsFromContext(r.Context()); claims != nil {
 		operator = claims.Username

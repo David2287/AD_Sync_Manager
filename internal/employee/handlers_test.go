@@ -1,6 +1,7 @@
 package employee
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -276,7 +277,7 @@ func TestIntegration_GetAllEmployees(t *testing.T) {
 	require.NoError(t, err)
 	Init(cfg.AD)
 
-	employees, total, err := GetAllEmployees(cfg.AD.EmployeeOU, buildListFilter(""), 50, 0)
+	employees, total, err := GetAllEmployees(context.Background(), cfg.AD.EmployeeOU, buildListFilter(""), 50, 0)
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, total, 0)
 	t.Logf("GetAllEmployees: %d returned (total=%d)", len(employees), total)
@@ -294,7 +295,7 @@ func TestIntegration_GetAllEmployees_WithSearch(t *testing.T) {
 	if search == "" {
 		search = "test"
 	}
-	_, total, err := GetAllEmployees(cfg.AD.EmployeeOU, buildListFilter(search), 50, 0)
+	_, total, err := GetAllEmployees(context.Background(), cfg.AD.EmployeeOU, buildListFilter(search), 50, 0)
 	require.NoError(t, err)
 	t.Logf("search=%q total=%d", search, total)
 }
@@ -311,7 +312,7 @@ func TestIntegration_GetEmployeeByDN(t *testing.T) {
 	require.NoError(t, err)
 	Init(cfg.AD)
 
-	emp, err := GetEmployeeByDN(dn)
+	emp, err := GetEmployeeByDN(context.Background(), dn)
 	require.NoError(t, err)
 	assert.Equal(t, dn, emp.DN)
 	t.Logf("employee: %+v", emp)
@@ -325,6 +326,6 @@ func TestIntegration_GetEmployeeByDN_NotFound(t *testing.T) {
 	require.NoError(t, err)
 	Init(cfg.AD)
 
-	_, err = GetEmployeeByDN("CN=DoesNotExist,DC=company,DC=com")
+	_, err = GetEmployeeByDN(context.Background(), "CN=DoesNotExist,DC=company,DC=com")
 	assert.ErrorIs(t, err, ErrNotFound)
 }

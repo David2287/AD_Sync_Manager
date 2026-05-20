@@ -27,6 +27,7 @@ type RouterDeps struct {
 	Mode             string // "debug" | "release"
 	AdminGroupDN     string // AD group whose members have admin access
 	EditorGroupDN    string // AD group whose members may update employee attributes
+	UseUserBind      bool   // when true, web AD requests bind as the authenticated user
 	AuditQuerier     audit.AuditQuerier        // nil if DB audit logging is not configured
 	IntegrityChecker *integrity.Checker        // nil if integrity checking is disabled
 	// StaticFS is the embedded frontend build. When non-nil, the router serves
@@ -69,7 +70,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 	// ── Health probe ──────────────────────────────────────────────────────────
 	r.GET("/healthz", func(c *gin.Context) { c.Status(http.StatusOK) })
 
-	authHandler := httphandlers.NewAuthHandler()
+	authHandler := httphandlers.NewAuthHandler(deps.UseUserBind)
 
 	// ── Public login (both paths for backwards-compatibility) ─────────────────
 	r.POST("/api/login", authHandler.Login)

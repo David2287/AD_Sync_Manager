@@ -22,7 +22,7 @@ func init() {
 // newLoginRouter sets up a minimal Gin router with the Login endpoint.
 func newLoginRouter() *gin.Engine {
 	r := gin.New()
-	h := httphandlers.NewAuthHandler()
+	h := httphandlers.NewAuthHandler(false)
 	r.POST("/login", h.Login)
 	r.POST("/logout", h.Logout)
 	r.GET("/me", h.Me)
@@ -146,7 +146,7 @@ func TestMe_WithClaims_ReturnsProfile(t *testing.T) {
 	claims := &auth.Claims{Username: "bob", DN: "CN=Bob,DC=company,DC=com", Groups: []string{"CN=IT"}}
 
 	r := gin.New()
-	h := httphandlers.NewAuthHandler()
+	h := httphandlers.NewAuthHandler(false)
 	r.GET("/me", func(c *gin.Context) {
 		// Inject claims directly into the request context, mimicking RequireAuth.
 		c.Request = c.Request.WithContext(auth.ContextWithClaims(c.Request.Context(), claims))

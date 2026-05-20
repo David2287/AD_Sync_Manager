@@ -176,6 +176,44 @@ All endpoints are under `/api/v1`. Authentication is via `Authorization: Bearer 
 | `INTEGRITY_ENABLED` | no | `true` | Enable background integrity checker |
 | `INTEGRITY_INTERVAL` | no | `1h` | Interval between integrity checks |
 | `INTEGRITY_AUTO_UPDATE` | no | `false` | Automatically update baseline on mismatch |
+| `AD_USE_USER_BIND` | no | `false` | Bind to AD as the authenticated user for web requests (see below) |
+
+---
+
+## User-Bind Mode (`AD_USE_USER_BIND`)
+
+By default all AD operations (listing employees, updating attributes, markdown apply) use the dedicated service account (`AD_BIND_DN` / `AD_BIND_PASSWORD`). Setting `AD_USE_USER_BIND=true` changes this so that every authenticated web request binds to AD using the logged-in user's own credentials.
+
+### How it works
+
+1. **Login** — user submits their AD username and password to `POST /api/v1/auth/login`. The server verifies them against AD and issues a JWT.
+2. **Credential cache** — with user-bind mode active, the server stores the user's LDAP DN + plaintext password in an in-process memory map keyed by the raw JWT string. The entry expires when the JWT expires.
+3. **Subsequent requests** — `RequireAuth` middleware looks up the JWT in the credential cache and injects an `LDAPCred{DN, Password}` into the request context.
+4. **Repository layer** — `GetAllEmployees`, `GetEmployeeByDN`, and `UpdateEmployeeAttribute` check the context for a credential. When found, they open a fresh LDAP connection and bind as the user; otherwise they fall back to the service account.
+5. **Logout** — clears the cached credential immediately, preventing further use.
+
+### What still uses the service account
+
+Background services have no user context and always use the service account regardless of `AD_USE_USER_BIND`:
+- Scheduled LDAP sync (`syncService`)
+- Integrity background checker
+- `auth.AuthenticateAD` (the initial DN-search step during login)
+
+### Security considerations
+
+| Concern | Notes |
+|---------|-------|
+| Password storage | Plaintext password lives only in process memory for the JWT lifetime. Never written to disk, logged, or transmitted. |
+| Memory exposure | Any process-memory dump could expose credentials. Mitigate with OS-level protections and short `JWT_EXPIRY`. |
+| Token revocation | Logout immediately purges the credential from the cache in addition to revoking the JWT. |
+| Service account | Still required for background tasks. `AD_BIND_DN` / `AD_BIND_PASSWORD` must remain set. |
+
+### Enabling
+
+```env
+AD_USE_USER_BIND=true
+JWT_EXPIRY=8h   # credentials are held for this long after login
+```
 
 ---
 

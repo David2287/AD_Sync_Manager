@@ -58,7 +58,7 @@ func ListEmployeesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	employees, total, err := GetAllEmployees(adCfg.EmployeeOU, filter, limit, offset)
+	employees, total, err := GetAllEmployees(r.Context(), adCfg.EmployeeOU, filter, limit, offset)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to list employees")
 		return
@@ -87,7 +87,7 @@ func GetEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	emp, err := GetEmployeeByDN(dn)
+	emp, err := GetEmployeeByDN(r.Context(), dn)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			writeJSONError(w, http.StatusNotFound, "employee not found")
@@ -140,7 +140,7 @@ func UpdateEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	// Fetch current attribute values before mutating so we can log old → new.
 	// Best-effort: if the lookup fails we log with empty old values and continue.
 	var oldPhone, oldOffice string
-	if old, err := GetEmployeeByDN(dn); err == nil {
+	if old, err := GetEmployeeByDN(r.Context(), dn); err == nil {
 		oldPhone = old.TelephoneNumber
 		oldOffice = old.Office
 	}
@@ -153,7 +153,7 @@ func UpdateEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		if u.val == "" {
 			continue
 		}
-		updateErr := UpdateEmployeeAttribute(dn, u.attr, u.val)
+		updateErr := UpdateEmployeeAttribute(r.Context(), dn, u.attr, u.val)
 		var errMsg string
 		if updateErr != nil {
 			errMsg = updateErr.Error()
@@ -169,7 +169,7 @@ func UpdateEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	pkgCache.Delete("employee:" + dn)
 	atomic.AddInt64(&listVersion, 1)
 
-	emp, err := GetEmployeeByDN(dn)
+	emp, err := GetEmployeeByDN(r.Context(), dn)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			writeJSONError(w, http.StatusNotFound, "employee not found")

@@ -25,7 +25,7 @@ const testSecret = "test-secret-that-is-at-least-32-chars!!"
 
 func newBundle(adminGroupDN string) *middleware.Bundle {
 	log, _ := logger.New("error", "json")
-	return middleware.New(nil, log, adminGroupDN)
+	return middleware.New(nil, log, adminGroupDN, false)
 }
 
 // makeToken creates a signed JWT with the given username, dn, and groups.

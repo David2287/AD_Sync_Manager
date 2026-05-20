@@ -132,7 +132,7 @@ func main() {
 
 		lister := func() ([]integrity.EmployeeSnapshot, error) {
 			emps, _, err := employee.GetAllEmployees(
-				cfg.AD.EmployeeOU, adActiveUsersFilter, 100_000, 0)
+				context.Background(), cfg.AD.EmployeeOU, adActiveUsersFilter, 100_000, 0)
 			if err != nil {
 				return nil, err
 			}
@@ -160,7 +160,7 @@ func main() {
 	}
 
 	// ── Middleware ────────────────────────────────────────────────────────────
-	mw := middleware.New(nil, log, cfg.AD.AdminGroupDN)
+	mw := middleware.New(nil, log, cfg.AD.AdminGroupDN, cfg.AD.UseUserBind)
 	// Stage 2: auth middleware uses the auth package directly (no SessionService).
 
 	// ── HTTP router ───────────────────────────────────────────────────────────
@@ -173,6 +173,7 @@ func main() {
 		Mode:             cfg.Server.Mode,
 		AdminGroupDN:     cfg.AD.AdminGroupDN,
 		EditorGroupDN:    cfg.AD.EditorGroupDN,
+		UseUserBind:      cfg.AD.UseUserBind,
 		AuditQuerier:     dbLogger,
 		IntegrityChecker: integrityChecker,
 		StaticFS:         web.FS,

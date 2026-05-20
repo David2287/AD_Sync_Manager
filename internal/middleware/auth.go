@@ -39,9 +39,18 @@ func (b *Bundle) RequireAuth() gin.HandlerFunc {
 		// Store claims in both the Gin context (for Gin handlers) and the
 		// standard request context (for net/http handlers wrapped via gin.WrapF).
 		c.Set(ginClaimsKey, claims)
-		c.Request = c.Request.WithContext(
-			auth.ContextWithClaims(c.Request.Context(), claims),
-		)
+		ctx := auth.ContextWithClaims(c.Request.Context(), claims)
+
+		// When user-bind mode is active, look up the cached LDAP credentials for
+		// this token and inject them so that repository functions can bind as the
+		// authenticated user instead of the service account.
+		if b.useUserBind {
+			if cred, ok := auth.LookupCredential(rawToken); ok {
+				ctx = auth.ContextWithLDAPCred(ctx, cred)
+			}
+		}
+
+		c.Request = c.Request.WithContext(ctx)
 
 		c.Next()
 	}

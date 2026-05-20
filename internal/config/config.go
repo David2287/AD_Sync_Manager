@@ -36,6 +36,7 @@ type ADConfig struct {
 	EditorGroupDN string   // members of this group may update employee attributes
 	TLSSkipVerify bool     // never true in production
 	Attributes    []string // LDAP attributes to request
+	UseUserBind   bool     // AD_USE_USER_BIND — perform AD ops as the authenticated user instead of the service account
 }
 
 type JWTConfig struct {
@@ -94,6 +95,7 @@ func Load() (*Config, error) {
 			AdminGroupDN:  getEnv("AD_ADMIN_GROUP", ""),
 			EditorGroupDN: getEnv("AD_EDITOR_GROUP", ""),
 			TLSSkipVerify: parseBool(getEnv("AD_TLS_SKIP_VERIFY", "false")),
+			UseUserBind:   parseBool(getEnv("AD_USE_USER_BIND", "false")),
 			Attributes: []string{
 				"sAMAccountName",
 				"displayName",

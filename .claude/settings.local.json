@@ -11,7 +11,9 @@
       "PowerShell(Get-ChildItem \"C:\\\\Program Files\\\\Go\\\\bin\\\\go.exe\" -ErrorAction SilentlyContinue; Get-ChildItem \"C:\\\\Go\\\\bin\\\\go.exe\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:LOCALAPPDATA\\\\Programs\\\\go\\\\bin\\\\go.exe\" -ErrorAction SilentlyContinue; Get-ChildItem \"C:\\\\Users\\\\WhySkyDie\\\\go\\\\bin\\\\go.exe\" -ErrorAction SilentlyContinue)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\WhySkyDie\\\\Documents\\\\Contacts_AD\" -Recurse -Force)",
       "Bash(Select-Object -ExpandProperty FullName)",
-      "Bash(Sort-Object)"
+      "Bash(Sort-Object)",
+      "Bash(go build *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Program Files\\\\Go\\\\bin\" -ErrorAction SilentlyContinue; Get-ChildItem \"C:\\\\Go\\\\bin\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:USERPROFILE\\\\go\\\\bin\" -ErrorAction SilentlyContinue)"
     ]
   }
 }
