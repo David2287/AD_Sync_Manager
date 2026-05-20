@@ -1,0 +1,134 @@
+# docker-compose.test.yml — End-to-end test environment
+#
+# Spins up an OpenLDAP server pre-seeded with test data and the AD-Sync Manager
+# application. Use this for integration tests that require a real LDAP connection.
+#
+# Usage:
+#   docker compose -f deployments/docker-compose.test.yml up -d
+#   go test ./... -run Integration -v
+#   docker compose -f deployments/docker-compose.test.yml down -v
+#
+# Note: OpenLDAP does not support the AD-specific LDAP_MATCHING_RULE_IN_CHAIN OID
+# used for nested group resolution. The memberOf fallback path will be used instead,
+# which tests direct group membership correctly.
+
+version: "3.9"
+
+services:
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: adsync-test-ldap
+    environment:
+      LDAP_ORGANISATION: "Test Corp"
+      LDAP_DOMAIN: "company.com"
+      LDAP_ADMIN_PASSWORD: "adminpass"
+      LDAP_TLS: "false"
+    ports:
+      - "1389:389"
+    volumes:
+      - ./testdata/ldap/seed.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/seed.ldif:ro
+    command: --loglevel warning --copy-service
+    healthcheck:
+      test: ["CMD", "ldapsearch", "-x", "-H", "ldap://localhost:389",
+             "-D", "cn=admin,dc=company,dc=com", "-w", "adminpass",
+             "-b", "dc=company,dc=com", "(objectClass=organizationalUnit)"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    container_name: adsync-test-app
+    depends_on:
+      openldap:
+        condition: service_healthy
+    environment:
+      AD_URL: "ldap://openldap:389"
+      AD_BASE_DN: "dc=company,dc=com"
+      AD_EMPLOYEE_OU: "ou=Employees,dc=company,dc=com"
+      AD_BIND_DN: "cn=admin,dc=company,dc=com"
+      AD_BIND_PASSWORD: "adminpass"
+      AD_TLS_SKIP_VERIFY: "true"
+      AD_ADMIN_GROUP: "cn=Admins,ou=Groups,dc=company,dc=com"
+      AD_EDITOR_GROUP: "cn=Editors,ou=Groups,dc=company,dc=com"
+      JWT_SECRET: "e2e-test-secret-must-be-32-chars-min!!"
+      LOG_FILE_PATH: "/tmp/audit.jsonl"
+      LOG_DB_DSN: "/tmp/audit.db"
+      INTEGRITY_ENABLED: "true"
+      INTEGRITY_INTERVAL: "5m"
+      SERVER_PORT: "8080"
+      GIN_MODE: "release"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+# ── Test data seed LDIF ────────────────────────────────────────────────────────
+#
+# Save as deployments/testdata/ldap/seed.ldif before running:
+#
+#   dn: ou=Employees,dc=company,dc=com
+#   objectClass: organizationalUnit
+#   ou: Employees
+#
+#   dn: ou=Groups,dc=company,dc=com
+#   objectClass: organizationalUnit
+#   ou: Groups
+#
+#   dn: cn=jdoe,ou=Employees,dc=company,dc=com
+#   objectClass: inetOrgPerson
+#   objectClass: organizationalPerson
+#   objectClass: person
+#   objectClass: top
+#   cn: jdoe
+#   sn: Doe
+#   displayName: John Doe
+#   mail: jdoe@company.com
+#   telephoneNumber: +1 555 100 0001
+#   l: A-101
+#   userPassword: {SSHA}secret-hashed-value
+#
+#   dn: cn=jsmith,ou=Employees,dc=company,dc=com
+#   objectClass: inetOrgPerson
+#   objectClass: organizationalPerson
+#   objectClass: person
+#   objectClass: top
+#   cn: jsmith
+#   sn: Smith
+#   displayName: Jane Smith
+#   mail: jsmith@company.com
+#   telephoneNumber: +1 555 100 0002
+#   l: B-202
+#   userPassword: {SSHA}secret-hashed-value
+#
+#   dn: cn=Admins,ou=Groups,dc=company,dc=com
+#   objectClass: groupOfNames
+#   cn: Admins
+#   member: cn=jdoe,ou=Employees,dc=company,dc=com
+#
+#   dn: cn=Editors,ou=Groups,dc=company,dc=com
+#   objectClass: groupOfNames
+#   cn: Editors
+#   member: cn=jsmith,ou=Employees,dc=company,dc=com
+#
+# Environment variables for running integration tests locally:
+#
+#   export AD_URL=ldap://localhost:1389
+#   export AD_BASE_DN=dc=company,dc=com
+#   export AD_EMPLOYEE_OU=ou=Employees,dc=company,dc=com
+#   export AD_BIND_DN=cn=admin,dc=company,dc=com
+#   export AD_BIND_PASSWORD=adminpass
+#   export AD_TLS_SKIP_VERIFY=true
+#   export AD_ADMIN_GROUP=cn=Admins,ou=Groups,dc=company,dc=com
+#   export AD_EDITOR_GROUP=cn=Editors,ou=Groups,dc=company,dc=com
+#   export JWT_SECRET=integration-test-secret-32-chars-min!!
+#   export TEST_USER=jdoe
+#   export TEST_PASSWORD=secret
+#   export TEST_EMPLOYEE_DN=cn=jdoe,ou=Employees,dc=company,dc=com
+#
+#   go test ./... -run Integration -v -timeout 60s

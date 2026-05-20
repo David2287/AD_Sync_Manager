@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"c:\\\\Users\\\\WhySkyDie\\\\Documents\\\\Contacts_AD\\\\internal\\\\auth\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\WhySkyDie\\\\Documents\\\\Contacts_AD\" -Recurse -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object FullName)",
+      "Bash(ConvertTo-Csv -NoTypeInformation)",
+      "Bash(Out-String)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\WhySkyDie\\\\Documents\\\\Contacts_AD\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName | ForEach-Object { $_.FullName })",
+      "Bash(go get *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Program Files\\\\Go\\\\bin\\\\go.exe\" -ErrorAction SilentlyContinue; Get-ChildItem \"C:\\\\Go\\\\bin\\\\go.exe\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:LOCALAPPDATA\\\\Programs\\\\go\\\\bin\\\\go.exe\" -ErrorAction SilentlyContinue; Get-ChildItem \"C:\\\\Users\\\\WhySkyDie\\\\go\\\\bin\\\\go.exe\" -ErrorAction SilentlyContinue)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\WhySkyDie\\\\Documents\\\\Contacts_AD\" -Recurse -Force)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)"
+    ]
+  }
+}

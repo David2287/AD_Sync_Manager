@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-slate-900 text-slate-100;
+  }
+
+  html.light {
+    @apply bg-slate-100 text-slate-900;
+  }
+
+  /* Scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.slate.600') transparent;
+  }
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background-color: theme('colors.slate.600'); border-radius: 3px; }
+}
+
+@layer components {
+  /* Light mode overrides for key surfaces */
+  html.light .bg-slate-900 { @apply bg-slate-100; }
+  html.light .bg-slate-800 { @apply bg-white; }
+  html.light .bg-slate-800\/60 { @apply bg-slate-50; }
+  html.light .border-slate-700 { @apply border-slate-200; }
+  html.light .border-slate-700\/50 { @apply border-slate-200; }
+  html.light .text-slate-100 { @apply text-slate-900; }
+  html.light .text-slate-300 { @apply text-slate-700; }
+  html.light .text-slate-400 { @apply text-slate-500; }
+  html.light .text-slate-500 { @apply text-slate-400; }
+  html.light .hover\:bg-slate-700:hover { @apply bg-slate-100; }
+  html.light .hover\:bg-slate-800\/30:hover { @apply bg-slate-50; }
+  html.light .hover\:bg-slate-800\/40:hover { @apply bg-slate-50; }
+}
